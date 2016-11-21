@@ -38,10 +38,6 @@
                                     <userDefinedRuntimeAttribute type="number" keyPath="startDegrees">
                                         <real key="value" value="0.0"/>
                                     </userDefinedRuntimeAttribute>
-                                    <userDefinedRuntimeAttribute type="boolean" keyPath="ibPreview" value="NO"/>
-                                    <userDefinedRuntimeAttribute type="number" keyPath="numItems">
-                                        <integer key="value" value="8"/>
-                                    </userDefinedRuntimeAttribute>
                                 </userDefinedRuntimeAttributes>
                             </view>
                         </subviews>
