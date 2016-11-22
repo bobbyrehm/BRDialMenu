@@ -28,6 +28,13 @@ struct Angle {
     }
 }
 
+enum Orientation: Double {
+    case up = -90.0
+    case down = 90.0
+    case left = 0.0
+    case right = 180.0
+}
+
 extension CGPoint {
     static func pointOnCircumference(origin: CGPoint, radius: Double, angle: Angle) -> CGPoint {
         
@@ -57,6 +64,12 @@ extension CGPoint {
     func inQuadrantIV() -> Bool {
         return x > 0 && y < 0
     }
+    
+    func cartesianCoordinate(center: CGPoint) -> CGPoint {
+        let x1 = x - center.x
+        let y1 = -(y - center.y)
+        return CGPoint(x: x1, y: y1)
+    }
 }
 
 extension CGRect {
@@ -75,26 +88,48 @@ extension CGRect {
     }
 }
 
-typealias BRDialMenuItem = UIButton
+protocol BRDialMenuDataSource {
+    func numberOfItems(inMenu menu: BRDialMenu) -> Int
+    func viewForItem(inMenu menu: BRDialMenu, atIndex index: Int) -> UIView
+}
 
 @IBDesignable
 class BRDialMenu: UIView {
 
-    var menuItems: [BRDialMenuItem] = []
+    //public
+    var dataSource: BRDialMenuDataSource?
     @IBInspectable var itemDiameter: CGFloat = 30.0
     @IBInspectable var outlineColor: UIColor = .white
     @IBInspectable var outlineConnected: Bool = true
     @IBInspectable var outlineWidth: CGFloat = 3.0
-    @IBInspectable var startDegrees: CGFloat = 0 { //0 degrees = 3 PM on clock, moving clockwise
+    var snapsToNearestSector = true
+    var sectorWidth = 30.0 //degrees
+    var respondsToUserTouch = true {
         didSet {
-            self.drawStartAngle = Angle(degrees: Double(startDegrees))
+            if respondsToUserTouch {
+                self.gestureRecognizers = [panGestureRecognizer]
+            } else {
+                self.gestureRecognizers = []
+            }
         }
     }
+    var orientation = Orientation.up
     
-    var drawStartAngle = Angle(degrees: 0) //0 degrees = 3 PM on clock, moving clockwise
+    //private
+    var container = UIView()
+    var startTransform = CGAffineTransform()
+    var deltaAngle = 0.0
+    
+    var numberOfItems: Int {
+        get {
+            return dataSource?.numberOfItems(inMenu: self) ?? 0
+        }
+    }
+    private(set) var menuItems: [UIView] = []
+    
+    var inNoSpinZone = false
+    
     var panGestureRecognizer = UIPanGestureRecognizer()
-
-    private var firstDraw = true
     
     var circleRadius: Double {
         let viewLength = min(self.frame.size.width, self.frame.size.height)
@@ -117,11 +152,12 @@ class BRDialMenu: UIView {
     
     func commonInit() {
         isOpaque = false
-        backgroundColor = UIColor.clear
         clearsContextBeforeDrawing = true
         panGestureRecognizer.addTarget(self, action: #selector(handlePan))
         panGestureRecognizer.delegate = self
-        addGestureRecognizer(panGestureRecognizer)
+        if respondsToUserTouch {
+            addGestureRecognizer(panGestureRecognizer)
+        }
     }
     
     //using law of cosines: C = acos((c^2 - a^2 - b^2)/(-2ab))
@@ -242,19 +278,20 @@ class BRDialMenu: UIView {
     
     func angleBetweenCircleEdges() -> Angle {
         let degreesFromEdgeToEdgeOfCircle = angleBetweenCircleCenterAndCircleEdge().degrees * 2.0
-        let degreesCoveredByCircles = Double(menuItems.count) * degreesFromEdgeToEdgeOfCircle
+        let degreesCoveredByCircles = Double(numberOfItems) * degreesFromEdgeToEdgeOfCircle
         let remainingDegrees = 360 - degreesCoveredByCircles
-        return Angle(degrees: remainingDegrees / Double(menuItems.count))
+        return Angle(degrees: remainingDegrees / Double(numberOfItems))
     }
     
     func frameForItem(atIndex index: Int, startAngle: Angle, center: CGPoint) -> CGRect {
-        let angleBetweenCircleCenters = Angle(degrees: 360.0 / Double(menuItems.count))
+        let angleBetweenCircleCenters = Angle(degrees: 360.0 / Double(numberOfItems))
         let itemCenter = CGPoint.pointOnCircumference(origin: center, radius: circleRadius, angle: Angle(degrees: startAngle.degrees + Double(index) * angleBetweenCircleCenters.degrees))
         return CGRect(center: itemCenter, size: CGSize(width: itemDiameter, height: itemDiameter))
     }
     
     override func draw(_ rect: CGRect) {
         let center = rect.center
+        menuItems = []
         
         if outlineConnected {
             let circleBackgroundPath = UIBezierPath(ovalIn: CGRect(center: center, size: CGSize(width: circleRadius * 2, height: circleRadius * 2)))
@@ -266,14 +303,29 @@ class BRDialMenu: UIView {
             layer.addSublayer(circleBackgroundLayer)
         }
         
-        for i in 0..<menuItems.count {
-            let item = menuItems[i]
-            item.frame = frameForItem(atIndex: i, startAngle: drawStartAngle, center: center)
+        container = UIView(frame: rect)
+        
+        for i in 0..<numberOfItems {
+            let item = dataSource!.viewForItem(inMenu: self, atIndex: i)
+            item.frame = frameForItem(atIndex: i, startAngle: Angle(degrees:orientation.rawValue), center: center)
             item.layer.borderColor = outlineColor.cgColor
             item.layer.borderWidth = outlineWidth
             item.layer.cornerRadius = item.frame.size.width / 2.0
             item.clipsToBounds = true
-            addSubview(item)
+            container.addSubview(item)
+            menuItems.append(item)
+        }
+        addSubview(container)
+    }
+    
+    var menuItemTransforms: [CGAffineTransform] = []
+    func storeItemTransforms() {
+        menuItemTransforms = menuItems.map{$0.transform}
+    }
+    
+    func updateItemTransforms(angleDifference: CGFloat) {
+        for (i, item) in self.menuItems.enumerated() {
+            item.transform = menuItemTransforms[i].rotated(by: -angleDifference)
         }
     }
 }
@@ -284,45 +336,68 @@ class BRDialMenu: UIView {
 extension BRDialMenu: UIGestureRecognizerDelegate {
     
     func handlePan(recognizer: UIPanGestureRecognizer) {
-        let point = recognizer.location(in: self)
-        let translation = recognizer.translation(in: self)
-        let previousPoint = CGPoint(x: point.x - translation.x, y: point.y - translation.y)
-        //let deltaAngle = directedAngleBetween(p1: previousPoint, p2: point)
-        let dx1 = previousPoint.x - center.x
-        let dy1 = previousPoint.y - center.y
-        let angle1 = atan2(dy1, dx1)
-        let dx2 = point.x - center.x
-        let dy2 = point.y - center.y
-        let angle2 = atan2(dy2, dx2)
-        
-        let deltaAngle = angle2 - angle1
+        if recognizer.state == .began || inNoSpinZone {
+            let point = recognizer.location(in: self)
+            if pointWithinPanDistance(point: point) {
+                inNoSpinZone = false
+            }
+            if recognizer.state == .ended {
+                if snapsToNearestSector {
+                    snapToNearestSector()
+                }
+                return
+            }
+            let dx = point.x - container.center.x
+            let dy = point.y - container.center.y
+            deltaAngle = atan2(Double(dy), Double(dx))
+            startTransform = container.transform
+            storeItemTransforms()
+        } else if recognizer.state == .changed {
+            let point = recognizer.location(in: self)
+            if (pointWithinPanDistance(point: point)) {
+                if !inNoSpinZone {
+                    let dx = point.x - container.center.x
+                    let dy = point.y - container.center.y
+                    let angle = atan2(Double(dy), Double(dx))
+                    let angleDifference = CGFloat(angle - deltaAngle)
+                    container.transform = startTransform.rotated(by: angleDifference)
+                    updateItemTransforms(angleDifference: angleDifference)
+                }
+            } else {
+                inNoSpinZone = true
+            }
+        } else if recognizer.state == .ended {
+            if snapsToNearestSector {
+                snapToNearestSector()
+            }
+        }
+    }
     
-        drawStartAngle.radians = drawStartAngle.radians + Double(deltaAngle)
-        setNeedsDisplay()
+    func snapToNearestSector() {
+        let currentTransformAngle = atan2(Double(container.transform.b), Double(container.transform.a))
+        let currentAngle = Angle(radians: currentTransformAngle)
+        let nearestSectorAngle = self.nearestSector(angle: currentAngle.radians)
+        let snapAngle = nearestSectorAngle - currentAngle.radians
+        UIView.animate(withDuration: 0.2, animations: {
+            self.container.transform = self.container.transform.rotated(by: CGFloat(snapAngle))
+        })
+    }
+    
+    func nearestSector(angle: Double) -> Double {
+        let sectorAngle = Angle(degrees: sectorWidth)
+        let div = round(angle / sectorAngle.radians)
+        return div * sectorAngle.radians
     }
     
     func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
         let point = touch.location(in: self)
-        let distanceFromCenter = point.distance(toPoint: CGPoint(x: self.frame.size.width / 2.0, y: self.frame.size.height / 2.0))
-        return distanceFromCenter > 50 && distanceFromCenter < (CGFloat(circleRadius) + itemDiameter * 2)
+        return pointWithinPanDistance(point: point)
     }
     
-    /*
-    override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
-        let touch = touches.first!
-        let currentLocation = touch.location(in: self)
-        let previousLocation = touch.previousLocation(in: self)
-        let currentAngle = atan2(currentLocation.y - center.y, currentLocation.x - center.x)
-        let previousAngle = atan2(previousLocation.y - center.y, previousLocation.x - center.x)
-        let deltaAngle = angleBetween(point: currentLocation, andPoint: previousLocation).degrees
-        if (previousAngle < currentAngle) {
-           // deltaAngle = -1 * deltaAngle
-        }
-        print("CurrentAngle: \(currentAngle)\nPreviousAngle: \(previousAngle)\nDeltaAngle: \(deltaAngle)")
-        //self.transform = CGAffineTransform(rotationAngle: CGFloat(angle.radians))
-        drawStartAngle = Angle(degrees: drawStartAngle.degrees + Double(deltaAngle))
-        setNeedsDisplay()
-    }*/
+    func pointWithinPanDistance(point: CGPoint) -> Bool {
+        let distanceFromCenter = point.distance(toPoint: CGPoint(x: self.frame.size.width / 2.0, y: self.frame.size.height / 2.0))
+        return distanceFromCenter > (CGFloat(circleRadius) - itemDiameter * 1.5) && distanceFromCenter < (CGFloat(circleRadius) + itemDiameter * 2)
+    }
 }
 
 

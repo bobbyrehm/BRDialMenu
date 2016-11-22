@@ -23,7 +23,7 @@
                         <subviews>
                             <view contentMode="scaleToFill" translatesAutoresizingMaskIntoConstraints="NO" id="6Qy-Py-FDv" customClass="BRDialMenu" customModule="BRDialMenu" customModuleProvider="target">
                                 <rect key="frame" x="20" y="65" width="280" height="350"/>
-                                <color key="backgroundColor" white="1" alpha="1" colorSpace="calibratedWhite"/>
+                                <color key="backgroundColor" white="0.66666666666666663" alpha="1" colorSpace="calibratedWhite"/>
                                 <constraints>
                                     <constraint firstAttribute="height" constant="350" id="IYP-FH-Mt3"/>
                                 </constraints>
@@ -35,9 +35,6 @@
                                         <real key="value" value="2"/>
                                     </userDefinedRuntimeAttribute>
                                     <userDefinedRuntimeAttribute type="boolean" keyPath="outlineConnected" value="YES"/>
-                                    <userDefinedRuntimeAttribute type="number" keyPath="startDegrees">
-                                        <real key="value" value="0.0"/>
-                                    </userDefinedRuntimeAttribute>
                                 </userDefinedRuntimeAttributes>
                             </view>
                         </subviews>
