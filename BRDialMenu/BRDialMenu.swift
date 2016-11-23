@@ -28,6 +28,42 @@ struct Angle {
     }
 }
 
+struct Vector2D {
+    var x = 0.0, y = 0.0
+}
+
+extension Vector2D: CustomStringConvertible {
+    static func + (left: Vector2D, right: Vector2D) -> Vector2D {
+        return Vector2D(x: left.x + right.x, y: left.y + right.y)
+    }
+    static func - (left: Vector2D, right: Vector2D) -> Vector2D {
+        return Vector2D(x: left.x - right.x, y: left.y - right.y)
+    }
+    //dot product
+    static func * (left: Vector2D, right: Vector2D) -> Double {
+        return left.x * right.x + left.y * right.y
+    }
+    var magnitude: Double {
+        return sqrt(x * x + y * y)
+    }
+    mutating func scale(scalar: Double) {
+        x *= scalar
+        y *= scalar
+    }
+    //returns z value in 3-d vector, because cross product of two 2D vectors is <0, 0, z>
+    //http://math.stackexchange.com/a/116239
+    func crossProduct(_ vector: Vector2D) -> Double {
+        return x * vector.y - y * vector.x
+    }
+    
+    func unitVector() -> Vector2D {
+        return Vector2D(x: x / magnitude, y: y / magnitude)
+    }
+    var description: String {
+        return "Vector2D(x: \(x), y: \(y))"
+    }
+}
+
 enum Orientation: Double {
     case up = -90.0
     case down = 90.0
@@ -88,6 +124,12 @@ extension CGRect {
     }
 }
 
+extension UIViewKeyframeAnimationOptions {
+    init(animationOptions: UIViewAnimationOptions) {
+        rawValue = animationOptions.rawValue
+    }
+}
+
 protocol BRDialMenuDataSource {
     func numberOfItems(inMenu menu: BRDialMenu) -> Int
     func viewForItem(inMenu menu: BRDialMenu, atIndex index: Int) -> UIView
@@ -103,6 +145,8 @@ class BRDialMenu: UIView, UIGestureRecognizerDelegate {
     @IBInspectable var outlineConnected: Bool = true
     @IBInspectable var outlineWidth: CGFloat = 3.0
     var snapsToNearestSector = true
+    var spinsWithInertia = true
+    var decelerationRate = 2.0 //the larger the deceleration rate, the sooner the wheel comes to a stop
     var sectorWidth = 30.0 //degrees
     var respondsToUserTouch = true {
         didSet {
@@ -114,6 +158,7 @@ class BRDialMenu: UIView, UIGestureRecognizerDelegate {
         }
     }
     var orientation = Orientation.up
+    var snapSpeed = 0.1 //seconds per degree
     
     private var container = UIView()
     private var startTransform = CGAffineTransform()
@@ -234,22 +279,81 @@ class BRDialMenu: UIView, UIGestureRecognizerDelegate {
                 inNoSpinZone = true
             }
         } else if recognizer.state == .ended {
-            if snapsToNearestSector {
+            if spinsWithInertia {
+                let velocity = recognizer.velocity(in: self)
+                let velocityVector = Vector2D(x: Double(velocity.x), y: Double(velocity.y))
+                let point = recognizer.location(in: self)
+                decelerate(velocity: velocityVector, point: point)
+            } else if snapsToNearestSector {
                 snapToNearestSector()
             }
         }
     }
     
-    func snapToNearestSector() {
+    func decelerate(velocity: Vector2D, point: CGPoint) {
+        storeItemTransforms()
+        let vectorFromCenterToPoint = Vector2D(x: Double(point.x - container.center.x), y: Double(point.y - container.center.y))
+        //math from here: http://math.stackexchange.com/a/116239
+        let velocityTangentToCircle = vectorFromCenterToPoint.unitVector().crossProduct(velocity)
+        print(velocityTangentToCircle)
+        let circumference = 2 * M_PI * circleRadius
+        let revolutionsPerSecond = abs(velocityTangentToCircle / circumference)
+        let radiansPerSecond = revolutionsPerSecond * (2 * M_PI)
+        let duration = revolutionsPerSecond / decelerationRate
+        let radians = duration * radiansPerSecond / decelerationRate
+        let totalRevolutions = radians / (2 * M_PI)
+        let initialTransform = container.transform
+        UIView.animateKeyframes(withDuration: duration, delay: 0.0, options: [.allowUserInteraction, .calculationModePaced, UIViewKeyframeAnimationOptions(animationOptions: .curveEaseOut)], animations: {
+            var accumulatedRotation = 0.0
+            for _ in 0..<Int(ceil(totalRevolutions * 3)) {
+                let remainingRotation = (totalRevolutions * 2 * M_PI) - accumulatedRotation
+                let rotation = min(remainingRotation, 2.0 / 3.0 * M_PI)
+                accumulatedRotation += rotation
+                var directedRotation = accumulatedRotation
+                if velocityTangentToCircle < 0 {
+                    directedRotation *= -1
+                }
+                print("directedRotation: \(directedRotation)")
+                UIView.addKeyframe(withRelativeStartTime: 0.0, relativeDuration: 0.0, animations: { 
+                    self.container.transform = initialTransform.rotated(by: CGFloat(directedRotation))
+                    self.updateItemTransforms(angleDifference: CGFloat(directedRotation))
+                })
+            }
+            if self.snapsToNearestSector {
+                self.storeItemTransforms()
+                let currentTransformAngle = atan2(Double(self.container.transform.b), Double(self.container.transform.a))
+                let currentAngle = Angle(radians: currentTransformAngle)
+                let nearestSectorAngle = self.nearestSector(angle: currentAngle.radians)
+                let snapAngle = Angle(radians: nearestSectorAngle - currentAngle.radians)
+                UIView.addKeyframe(withRelativeStartTime: 0.0, relativeDuration: 0.0, animations: { 
+                    self.container.transform = self.container.transform.rotated(by: CGFloat(snapAngle.radians))
+                    self.updateItemTransforms(angleDifference: CGFloat(snapAngle.radians))
+                })
+            }
+        }, completion: { finished in
+            
+        })
+     /*   UIView.animate(withDuration: duration, delay: 0, options: [.allowUserInteraction, .curveEaseOut], animations: {
+            self.container.transform = self.container.transform.rotated(by: CGFloat(radians))
+            self.updateItemTransforms(angleDifference: CGFloat(radians))
+        }) { finished in
+            
+        } */
+    }
+    
+    func snapToNearestSector(duration: Double = 0.2, delay: Double = 0.0) {
         storeItemTransforms()
         let currentTransformAngle = atan2(Double(container.transform.b), Double(container.transform.a))
         let currentAngle = Angle(radians: currentTransformAngle)
         let nearestSectorAngle = self.nearestSector(angle: currentAngle.radians)
-        let snapAngle = nearestSectorAngle - currentAngle.radians
-        UIView.animate(withDuration: 0.2, animations: {
-            self.container.transform = self.container.transform.rotated(by: CGFloat(snapAngle))
-            self.updateItemTransforms(angleDifference: CGFloat(snapAngle))
-        })
+        let snapAngle = Angle(radians: nearestSectorAngle - currentAngle.radians)
+        
+        UIView.animate(withDuration: duration, delay: delay, options: [.allowUserInteraction, .curveEaseOut], animations: {
+            self.container.transform = self.container.transform.rotated(by: CGFloat(snapAngle.radians))
+            self.updateItemTransforms(angleDifference: CGFloat(snapAngle.radians))
+        }) { finished in
+            //finished animating
+        }
     }
     
     func nearestSector(angle: Double) -> Double {

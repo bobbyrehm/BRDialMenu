@@ -18,9 +18,12 @@ class ViewController: UIViewController {
         // Do any additional setup after loading the view, typically from a nib.
         dialMenu.itemDiameter = 60.0
         dialMenu.dataSource = self
-        dialMenu.sectorWidth = 360.0 / 3.0
+        dialMenu.sectorWidth = 360.0 / 16.0
+        dialMenu.snapsToNearestSector = true
+        dialMenu.spinsWithInertia = true
+        dialMenu.decelerationRate = 5.0
         
-        for _ in 0..<3 {
+        for _ in 0..<8 {
             let menuItem = UIButton(frame: CGRect(x: 0, y: 0, width: 60, height: 60))
             menuItem.setImage(UIImage(named: "Image"), for: UIControlState.normal)
             menuItems.append(menuItem)
