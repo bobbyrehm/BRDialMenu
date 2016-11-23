@@ -23,7 +23,7 @@
 		C528018D1DDE64D900AAF491 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		C52801901DDE64D900AAF491 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		C52801921DDE64D900AAF491 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		C52801981DDE654000AAF491 /* BRDialMenu.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BRDialMenu.swift; sourceTree = "<group>"; };
+		C52801981DDE654000AAF491 /* BRDialMenu.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = BRDialMenu.swift; path = Classes/BRDialMenu.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -58,13 +58,21 @@
 			children = (
 				C52801861DDE64D900AAF491 /* AppDelegate.swift */,
 				C52801881DDE64D900AAF491 /* ViewController.swift */,
-				C52801981DDE654000AAF491 /* BRDialMenu.swift */,
+				C54A95881DE6523F009DFA1C /* Classes */,
 				C528018A1DDE64D900AAF491 /* Main.storyboard */,
 				C528018D1DDE64D900AAF491 /* Assets.xcassets */,
 				C528018F1DDE64D900AAF491 /* LaunchScreen.storyboard */,
 				C52801921DDE64D900AAF491 /* Info.plist */,
 			);
 			path = BRDialMenu;
+			sourceTree = "<group>";
+		};
+		C54A95881DE6523F009DFA1C /* Classes */ = {
+			isa = PBXGroup;
+			children = (
+				C52801981DDE654000AAF491 /* BRDialMenu.swift */,
+			);
+			name = Classes;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
