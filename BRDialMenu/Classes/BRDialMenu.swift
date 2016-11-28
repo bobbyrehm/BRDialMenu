@@ -158,8 +158,8 @@ public class BRDialMenu: UIView, UIGestureRecognizerDelegate {
         }
     }
     public var orientation = Orientation.up
-    public var snapSpeed = 0.1 //seconds per degree
-    
+
+    //private
     private var container = UIView()
     private var startTransform = CGAffineTransform()
     private var deltaAngle = 0.0
@@ -201,7 +201,7 @@ public class BRDialMenu: UIView, UIGestureRecognizerDelegate {
         }
     }
     
-    func frameForItem(atIndex index: Int, startAngle: Angle, center: CGPoint) -> CGRect {
+    private func frameForItem(atIndex index: Int, startAngle: Angle, center: CGPoint) -> CGRect {
         let angleBetweenCircleCenters = Angle(degrees: 360.0 / Double(numberOfItems))
         let itemCenter = CGPoint.pointOnCircumference(origin: center, radius: circleRadius, angle: Angle(degrees: startAngle.degrees + Double(index) * angleBetweenCircleCenters.degrees))
         return CGRect(center: itemCenter, size: CGSize(width: itemDiameter, height: itemDiameter))
@@ -236,12 +236,12 @@ public class BRDialMenu: UIView, UIGestureRecognizerDelegate {
         addSubview(container)
     }
     
-    var menuItemTransforms: [CGAffineTransform] = []
-    func storeItemTransforms() {
+    private var menuItemTransforms: [CGAffineTransform] = []
+    private func storeItemTransforms() {
         menuItemTransforms = menuItems.map{$0.transform}
     }
     
-    func updateItemTransforms(angleDifference: CGFloat) {
+    private func updateItemTransforms(angleDifference: CGFloat) {
         for (i, item) in self.menuItems.enumerated() {
             item.transform = menuItemTransforms[i].rotated(by: -angleDifference)
         }
@@ -290,12 +290,11 @@ public class BRDialMenu: UIView, UIGestureRecognizerDelegate {
         }
     }
     
-    func decelerate(velocity: Vector2D, point: CGPoint) {
+    private func decelerate(velocity: Vector2D, point: CGPoint) {
         storeItemTransforms()
         let vectorFromCenterToPoint = Vector2D(x: Double(point.x - container.center.x), y: Double(point.y - container.center.y))
         //math from here: http://math.stackexchange.com/a/116239
         let velocityTangentToCircle = vectorFromCenterToPoint.unitVector().crossProduct(velocity)
-        print(velocityTangentToCircle)
         let circumference = 2 * M_PI * circleRadius
         let revolutionsPerSecond = abs(velocityTangentToCircle / circumference)
         let radiansPerSecond = revolutionsPerSecond * (2 * M_PI)
@@ -313,8 +312,7 @@ public class BRDialMenu: UIView, UIGestureRecognizerDelegate {
                 if velocityTangentToCircle < 0 {
                     directedRotation *= -1
                 }
-                print("directedRotation: \(directedRotation)")
-                UIView.addKeyframe(withRelativeStartTime: 0.0, relativeDuration: 0.0, animations: { 
+                UIView.addKeyframe(withRelativeStartTime: 0.0, relativeDuration: 0.0, animations: {
                     self.container.transform = initialTransform.rotated(by: CGFloat(directedRotation))
                     self.updateItemTransforms(angleDifference: CGFloat(directedRotation))
                 })
@@ -341,7 +339,7 @@ public class BRDialMenu: UIView, UIGestureRecognizerDelegate {
         } */
     }
     
-    func snapToNearestSector(duration: Double = 0.2, delay: Double = 0.0) {
+    private func snapToNearestSector(duration: Double = 0.2, delay: Double = 0.0) {
         storeItemTransforms()
         let currentTransformAngle = atan2(Double(container.transform.b), Double(container.transform.a))
         let currentAngle = Angle(radians: currentTransformAngle)
@@ -356,7 +354,7 @@ public class BRDialMenu: UIView, UIGestureRecognizerDelegate {
         }
     }
     
-    func nearestSector(angle: Double) -> Double {
+    private func nearestSector(angle: Double) -> Double {
         let sectorAngle = Angle(degrees: sectorWidth)
         let div = round(angle / sectorAngle.radians)
         return div * sectorAngle.radians
@@ -367,7 +365,7 @@ public class BRDialMenu: UIView, UIGestureRecognizerDelegate {
         return pointWithinPanDistance(point: point)
     }
     
-    func pointWithinPanDistance(point: CGPoint) -> Bool {
+    private func pointWithinPanDistance(point: CGPoint) -> Bool {
         let distanceFromCenter = point.distance(toPoint: CGPoint(x: self.frame.size.width / 2.0, y: self.frame.size.height / 2.0))
         return distanceFromCenter > (CGFloat(circleRadius) - itemDiameter * 1.5) && distanceFromCenter < (CGFloat(circleRadius) + itemDiameter * 2)
     }
