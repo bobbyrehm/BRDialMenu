@@ -394,4 +394,22 @@ class BRDialMenu: UIView, UIGestureRecognizerDelegate {
  arcLayer.fillColor = UIColor.clear.cgColor
  layer.addSublayer(arcLayer)
  }
+ 
+ //using law of cosines: C = acos((c^2 - a^2 - b^2)/(-2ab))
+ func angleBetweenCircleCenterAndCircleEdge() -> Angle {
+ let a = circleRadius
+ let b = circleRadius
+ let c = Double(itemDiameter / 2.0)
+ let numerator = c * c - a * a - b * b
+ let denominator = -2 * a * b
+ return Angle(radians: acos(numerator / denominator))
+ }
+ 
+ func angleBetweenCircleEdges() -> Angle {
+ let degreesFromEdgeToEdgeOfCircle = angleBetweenCircleCenterAndCircleEdge().degrees * 2.0
+ let degreesCoveredByCircles = Double(menuItems.count) * degreesFromEdgeToEdgeOfCircle
+ let remainingDegrees = 360 - degreesCoveredByCircles
+ return Angle(degrees: remainingDegrees / Double(menuItems.count))
+ }
+ 
  */
