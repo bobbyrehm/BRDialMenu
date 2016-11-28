@@ -130,7 +130,7 @@ extension UIViewKeyframeAnimationOptions {
     }
 }
 
-protocol BRDialMenuDataSource {
+public protocol BRDialMenuDataSource {
     func numberOfItems(inMenu menu: BRDialMenu) -> Int
     func viewForItem(inMenu menu: BRDialMenu, atIndex index: Int) -> UIView
 }
