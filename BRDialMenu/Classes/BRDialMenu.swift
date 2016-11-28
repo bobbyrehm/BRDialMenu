@@ -64,7 +64,7 @@ extension Vector2D: CustomStringConvertible {
     }
 }
 
-enum Orientation: Double {
+public enum Orientation: Double {
     case up = -90.0
     case down = 90.0
     case left = 0.0
@@ -139,16 +139,16 @@ public protocol BRDialMenuDataSource {
 public class BRDialMenu: UIView, UIGestureRecognizerDelegate {
 
     //public
-    var dataSource: BRDialMenuDataSource?
-    @IBInspectable var itemDiameter: CGFloat = 30.0
-    @IBInspectable var outlineColor: UIColor = .white
-    @IBInspectable var outlineConnected: Bool = true
-    @IBInspectable var outlineWidth: CGFloat = 3.0
-    var snapsToNearestSector = true
-    var spinsWithInertia = true
-    var decelerationRate = 2.0 //the larger the deceleration rate, the sooner the wheel comes to a stop
-    var sectorWidth = 30.0 //degrees
-    var respondsToUserTouch = true {
+    public var dataSource: BRDialMenuDataSource?
+    @IBInspectable public var itemDiameter: CGFloat = 30.0
+    @IBInspectable public var outlineColor: UIColor = .white
+    @IBInspectable public var outlineConnected: Bool = true
+    @IBInspectable public var outlineWidth: CGFloat = 3.0
+    public var snapsToNearestSector = true
+    public var spinsWithInertia = true
+    public var decelerationRate = 2.0 //the larger the deceleration rate, the sooner the wheel comes to a stop
+    public var sectorWidth = 30.0 //degrees
+    public var respondsToUserTouch = true {
         didSet {
             if respondsToUserTouch {
                 self.gestureRecognizers = [panGestureRecognizer]
@@ -157,8 +157,8 @@ public class BRDialMenu: UIView, UIGestureRecognizerDelegate {
             }
         }
     }
-    var orientation = Orientation.up
-    var snapSpeed = 0.1 //seconds per degree
+    public var orientation = Orientation.up
+    public var snapSpeed = 0.1 //seconds per degree
     
     private var container = UIView()
     private var startTransform = CGAffineTransform()
@@ -172,7 +172,7 @@ public class BRDialMenu: UIView, UIGestureRecognizerDelegate {
     private var inNoSpinZone = false
     private var panGestureRecognizer = UIPanGestureRecognizer()
     
-    var circleRadius: Double {
+    private var circleRadius: Double {
         let viewLength = min(self.frame.size.width, self.frame.size.height)
         return (Double(viewLength) - Double(itemDiameter)) / 2.0
     }
