@@ -136,7 +136,7 @@ protocol BRDialMenuDataSource {
 }
 
 @IBDesignable
-class BRDialMenu: UIView, UIGestureRecognizerDelegate {
+public class BRDialMenu: UIView, UIGestureRecognizerDelegate {
 
     //public
     var dataSource: BRDialMenuDataSource?
@@ -186,7 +186,7 @@ class BRDialMenu: UIView, UIGestureRecognizerDelegate {
         commonInit()
     }
     
-    required init?(coder aDecoder: NSCoder) {
+    required public init?(coder aDecoder: NSCoder) {
         super.init(coder: aDecoder)
         commonInit()
     }
@@ -207,7 +207,7 @@ class BRDialMenu: UIView, UIGestureRecognizerDelegate {
         return CGRect(center: itemCenter, size: CGSize(width: itemDiameter, height: itemDiameter))
     }
     
-    override func draw(_ rect: CGRect) {
+    override public func draw(_ rect: CGRect) {
         let center = rect.center
         menuItems = []
         
@@ -362,7 +362,7 @@ class BRDialMenu: UIView, UIGestureRecognizerDelegate {
         return div * sectorAngle.radians
     }
     
-    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
+    public func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
         let point = touch.location(in: self)
         return pointWithinPanDistance(point: point)
     }
