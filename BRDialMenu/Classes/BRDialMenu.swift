@@ -136,7 +136,7 @@ protocol BRDialMenuDataSource {
 }
 
 @IBDesignable
-class BRDialMenu: UIView, UIGestureRecognizerDelegate {
+public class BRDialMenu: UIView, UIGestureRecognizerDelegate {
 
     //public
     var dataSource: BRDialMenuDataSource?
@@ -186,7 +186,7 @@ class BRDialMenu: UIView, UIGestureRecognizerDelegate {
         commonInit()
     }
     
-    required init?(coder aDecoder: NSCoder) {
+    required public init?(coder aDecoder: NSCoder) {
         super.init(coder: aDecoder)
         commonInit()
     }
@@ -207,7 +207,7 @@ class BRDialMenu: UIView, UIGestureRecognizerDelegate {
         return CGRect(center: itemCenter, size: CGSize(width: itemDiameter, height: itemDiameter))
     }
     
-    override func draw(_ rect: CGRect) {
+    override public func draw(_ rect: CGRect) {
         let center = rect.center
         menuItems = []
         
@@ -362,7 +362,7 @@ class BRDialMenu: UIView, UIGestureRecognizerDelegate {
         return div * sectorAngle.radians
     }
     
-    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
+    public func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
         let point = touch.location(in: self)
         return pointWithinPanDistance(point: point)
     }
@@ -394,4 +394,22 @@ class BRDialMenu: UIView, UIGestureRecognizerDelegate {
  arcLayer.fillColor = UIColor.clear.cgColor
  layer.addSublayer(arcLayer)
  }
+ 
+ //using law of cosines: C = acos((c^2 - a^2 - b^2)/(-2ab))
+ func angleBetweenCircleCenterAndCircleEdge() -> Angle {
+ let a = circleRadius
+ let b = circleRadius
+ let c = Double(itemDiameter / 2.0)
+ let numerator = c * c - a * a - b * b
+ let denominator = -2 * a * b
+ return Angle(radians: acos(numerator / denominator))
+ }
+ 
+ func angleBetweenCircleEdges() -> Angle {
+ let degreesFromEdgeToEdgeOfCircle = angleBetweenCircleCenterAndCircleEdge().degrees * 2.0
+ let degreesCoveredByCircles = Double(menuItems.count) * degreesFromEdgeToEdgeOfCircle
+ let remainingDegrees = 360 - degreesCoveredByCircles
+ return Angle(degrees: remainingDegrees / Double(menuItems.count))
+ }
+ 
  */
