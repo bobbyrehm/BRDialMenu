@@ -74,38 +74,12 @@ public class BRDialMenu: UIView, UIGestureRecognizerDelegate {
         commonInit()
     }
     
-    private var previousRadius: Double!
-    
     override public func layoutSubviews() {
         super.layoutSubviews()
-        if previousRadius == nil {
-            previousRadius = circleRadius
-        }
-        /*
-        if self.subviews.contains(translationContainer) {
-            let newCenter = self.bounds.center
-            let oldCenter = translationContainer.frame.center
-            if newCenter != oldCenter {
-                let dx = newCenter.x - oldCenter.x
-                let dy = newCenter.y - oldCenter.y
-                translationContainer.transform = translationContainer.transform.translatedBy(x: dx, y: dy)
-            }
-            
-            if previousRadius != circleRadius {
-                let scale = CGFloat(circleRadius / previousRadius)
-                //translationContainer.transform = translationContainer.transform.scaledBy(x: scale, y: scale)
-            }
-        }
-        */
-        if previousRadius != circleRadius {
-            previousRadius = circleRadius
-        }
+        self.setNeedsDisplay(self.rotationContainer.frame)
     }
     
     func commonInit() {
-        isOpaque = false
-        clearsContextBeforeDrawing = true
-        translatesAutoresizingMaskIntoConstraints = false
         panGestureRecognizer.addTarget(self, action: #selector(handlePan))
         panGestureRecognizer.delegate = self
         if respondsToUserTouch {
@@ -121,20 +95,15 @@ public class BRDialMenu: UIView, UIGestureRecognizerDelegate {
     
     override public func draw(_ rect: CGRect) {
         let center = rect.center
+        let rotationBeforeRedraw = self.currentRotationAngle()
         menuItems = []
         translationContainer.removeFromSuperview()
         rotationContainer.removeFromSuperview()
-    
-        if let circleBackgroundLayer = self.circleBackgroundLayer {
-            circleBackgroundLayer.removeFromSuperlayer()
-        }
-        
+ 
         let minDimension = min(rect.size.width, rect.size.height)
         let squareFrame = CGRect(center: center, size: CGSize(width: minDimension, height: minDimension))
         translationContainer = UIView(frame: squareFrame)
-        translationContainer.contentMode = .scaleAspectFit
         rotationContainer = UIView(frame: translationContainer.bounds)
-        rotationContainer.contentMode = .scaleAspectFit
         
         if outlineConnected {
             let circleBackgroundPath = UIBezierPath(ovalIn: CGRect(center: rotationContainer.bounds.center, size: CGSize(width: circleRadius * 2, height: circleRadius * 2)))
@@ -148,25 +117,29 @@ public class BRDialMenu: UIView, UIGestureRecognizerDelegate {
         
         for i in 0..<numberOfItems {
             let item = dataSource!.viewForItem(inMenu: self, atIndex: i)
-            item.frame = frameForItem(atIndex: i, startAngle: Angle(degrees:orientation.rawValue), center: rotationContainer.bounds.center)
             if let baseTransform = baseMenuItemTransforms[safe: i] {
                 item.transform = baseTransform
             }
+            item.frame = frameForItem(atIndex: i, startAngle: Angle(degrees:orientation.rawValue), center: rotationContainer.bounds.center)
             item.layer.borderColor = outlineColor.cgColor
             item.layer.borderWidth = outlineWidth
             item.layer.cornerRadius = item.frame.size.width / 2.0
-            item.clipsToBounds = false
+            item.clipsToBounds = true
             rotationContainer.addSubview(item)
             menuItems.append(item)
         }
+        storeItemTransforms()
         baseMenuItemTransforms = menuItems.map{$0.transform}
         
         translationContainer.addSubview(rotationContainer)
         addSubview(translationContainer)
         setupConstraints()
+        rotateWheel(byAngle: rotationBeforeRedraw)
     }
     
     private func setupConstraints() {
+        translatesAutoresizingMaskIntoConstraints = false
+        
         //translation container
         translationContainer.translatesAutoresizingMaskIntoConstraints = false
         let centerXConstraint = translationContainer.centerXAnchor.constraint(equalTo: self.centerXAnchor)
@@ -189,8 +162,20 @@ public class BRDialMenu: UIView, UIGestureRecognizerDelegate {
         translationContainer.addConstraints([height, width, centerX, centerY])
     }
     
+    private func currentRotationAngle() -> Angle {
+        let currentTransformAngle = atan2(Double(self.rotationContainer.transform.b), Double(self.rotationContainer.transform.a))
+        return Angle(radians: currentTransformAngle)
+    }
+    
     private func storeItemTransforms() {
         menuItemTransforms = menuItems.map{$0.transform}
+    }
+    
+    private func rotateWheel(byAngle angle: Angle) {
+        rotationContainer.transform = rotationContainer.transform.rotated(by: CGFloat(angle.radians))
+        for item in self.menuItems {
+            item.transform = item.transform.rotated(by: CGFloat(-angle.radians))
+        }
     }
     
     private func updateItemTransforms(angleDifference: CGFloat) {
@@ -271,8 +256,7 @@ public class BRDialMenu: UIView, UIGestureRecognizerDelegate {
             }
             if self.snapsToNearestSector {
                 self.storeItemTransforms()
-                let currentTransformAngle = atan2(Double(self.rotationContainer.transform.b), Double(self.rotationContainer.transform.a))
-                let currentAngle = Angle(radians: currentTransformAngle)
+                let currentAngle = self.currentRotationAngle()
                 let nearestSectorAngle = self.nearestSector(angle: currentAngle.radians)
                 let snapAngle = Angle(radians: nearestSectorAngle - currentAngle.radians)
                 UIView.addKeyframe(withRelativeStartTime: 0.0, relativeDuration: 0.0, animations: { 
