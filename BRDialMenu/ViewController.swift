@@ -22,12 +22,11 @@ class ViewController: UIViewController {
         dialMenu.snapsToNearestSector = true
         dialMenu.spinsWithInertia = true
         dialMenu.decelerationRate = 5.0
+        dialMenu.ignoresTouchesCloseToCenter = true
         
-        for i in 0..<8 {
+        for _ in 0..<8 {
             let menuItem = UIButton(frame: CGRect(x: 0, y: 0, width: 60, height: 60))
-            if i == 0 {
-                menuItem.setImage(UIImage(named: "Image"), for: UIControlState.normal)
-            }
+            menuItem.setImage(UIImage(named: "Image"), for: UIControlState.normal)
             menuItems.append(menuItem)
         }
     }
@@ -39,10 +38,10 @@ class ViewController: UIViewController {
 }
 
 extension ViewController: BRDialMenuDataSource {
-    func numberOfItems(inMenu menu: BRDialMenu) -> Int {
+    func numberOfItems(in menu: BRDialMenu) -> Int {
         return menuItems.count
     }
-    func viewForItem(inMenu menu: BRDialMenu, atIndex index: Int) -> UIView {
+    func viewForItem(in menu: BRDialMenu, at index: Int) -> UIView {
         return menuItems[index]
     }
 }

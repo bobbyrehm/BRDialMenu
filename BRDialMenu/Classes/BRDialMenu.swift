@@ -9,8 +9,8 @@
 import UIKit
 
 public protocol BRDialMenuDataSource {
-    func numberOfItems(inMenu menu: BRDialMenu) -> Int
-    func viewForItem(inMenu menu: BRDialMenu, atIndex index: Int) -> UIView
+    func numberOfItems(in menu: BRDialMenu) -> Int
+    func viewForItem(in menu: BRDialMenu, at index: Int) -> UIView
 }
 
 @IBDesignable
@@ -23,6 +23,7 @@ public class BRDialMenu: UIView, UIGestureRecognizerDelegate {
     @IBInspectable public var outlineConnected: Bool = true
     @IBInspectable public var outlineWidth: CGFloat = 3.0
     public var snapsToNearestSector = true
+    public var ignoresTouchesCloseToCenter = true
     public var spinsWithInertia = true
     public var decelerationRate = 2.0 //the larger the deceleration rate, the sooner the wheel comes to a stop
     public var sectorWidth = 30.0 //degrees
@@ -45,7 +46,7 @@ public class BRDialMenu: UIView, UIGestureRecognizerDelegate {
     private var deltaAngle = 0.0
     private var numberOfItems: Int {
         get {
-            return dataSource?.numberOfItems(inMenu: self) ?? 0
+            return dataSource?.numberOfItems(in: self) ?? 0
         }
     }
     private var menuItems: [UIView] = []
@@ -105,18 +106,8 @@ public class BRDialMenu: UIView, UIGestureRecognizerDelegate {
         translationContainer = UIView(frame: squareFrame)
         rotationContainer = UIView(frame: translationContainer.bounds)
         
-        if outlineConnected {
-            let circleBackgroundPath = UIBezierPath(ovalIn: CGRect(center: rotationContainer.bounds.center, size: CGSize(width: circleRadius * 2, height: circleRadius * 2)))
-            circleBackgroundLayer = CAShapeLayer()
-            circleBackgroundLayer.path = circleBackgroundPath.cgPath
-            circleBackgroundLayer.lineWidth = outlineWidth
-            circleBackgroundLayer.strokeColor = outlineColor.cgColor
-            circleBackgroundLayer.fillColor = UIColor.clear.cgColor
-            rotationContainer.layer.addSublayer(circleBackgroundLayer)
-        }
-        
         for i in 0..<numberOfItems {
-            let item = dataSource!.viewForItem(inMenu: self, atIndex: i)
+            let item = dataSource!.viewForItem(in: self, at: i)
             if let baseTransform = baseMenuItemTransforms[safe: i] {
                 item.transform = baseTransform
             }
@@ -127,6 +118,26 @@ public class BRDialMenu: UIView, UIGestureRecognizerDelegate {
             item.clipsToBounds = true
             rotationContainer.addSubview(item)
             menuItems.append(item)
+            
+            if outlineConnected {
+                //draw connecting line to next circle
+                let angleBetweenCircleCenters = Angle(degrees: 360.0 / Double(numberOfItems))
+                let angleBetweenCircleEdges = self.angleBetweenCircleEdges()
+                let startAngle = CGFloat(Angle(degrees: orientation.rawValue).radians) + CGFloat(i) * CGFloat(angleBetweenCircleCenters.radians) + CGFloat(angleBetweenCircleCenterAndCircleEdge().radians)
+                let endAngle = startAngle + CGFloat(angleBetweenCircleEdges.radians)
+                let connectingPath = UIBezierPath(
+                    arcCenter: rotationContainer.bounds.center,
+                    radius: CGFloat(circleRadius),
+                    startAngle: startAngle,
+                    endAngle: endAngle,
+                    clockwise: true)
+                let arcLayer = CAShapeLayer()
+                arcLayer.path = connectingPath.cgPath
+                arcLayer.lineWidth = outlineWidth
+                arcLayer.strokeColor = outlineColor.cgColor
+                arcLayer.fillColor = UIColor.clear.cgColor
+                rotationContainer.layer.addSublayer(arcLayer)
+            }
         }
         storeItemTransforms()
         baseMenuItemTransforms = menuItems.map{$0.transform}
@@ -296,7 +307,28 @@ public class BRDialMenu: UIView, UIGestureRecognizerDelegate {
     }
     
     private func pointWithinPanDistance(point: CGPoint) -> Bool {
-        let distanceFromCenter = point.distance(toPoint: CGPoint(x: self.frame.size.width / 2.0, y: self.frame.size.height / 2.0))
-        return distanceFromCenter > (CGFloat(circleRadius) - itemDiameter * 1.5) && distanceFromCenter < (CGFloat(circleRadius) + itemDiameter * 2)
+        if ignoresTouchesCloseToCenter {
+            let distanceFromCenter = point.distance(toPoint: CGPoint(x: self.frame.size.width / 2.0, y: self.frame.size.height / 2.0))
+            return (distanceFromCenter > (CGFloat(circleRadius) - itemDiameter * 1.5) && distanceFromCenter < (CGFloat(circleRadius) + itemDiameter * 2))
+        } else {
+            return true
+        }
+    }
+    
+    //using law of cosines: C = acos((c^2 - a^2 - b^2)/(-2ab))
+    func angleBetweenCircleCenterAndCircleEdge() -> Angle {
+        let a = circleRadius
+        let b = circleRadius
+        let c = Double(itemDiameter / 2.0)
+        let numerator = c * c - a * a - b * b
+        let denominator = -2 * a * b
+        return Angle(radians: acos(numerator / denominator))
+    }
+    
+    func angleBetweenCircleEdges() -> Angle {
+        let degreesFromEdgeToEdgeOfCircle = angleBetweenCircleCenterAndCircleEdge().degrees * 2.0
+        let degreesCoveredByCircles = Double(numberOfItems) * degreesFromEdgeToEdgeOfCircle
+        let remainingDegrees = 360 - degreesCoveredByCircles
+        return Angle(degrees: remainingDegrees / Double(numberOfItems))
     }
 }
