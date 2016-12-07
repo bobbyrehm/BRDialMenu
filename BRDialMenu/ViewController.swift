@@ -18,6 +18,7 @@ class ViewController: UIViewController {
         // Do any additional setup after loading the view, typically from a nib.
         dialMenu.itemDiameter = 60.0
         dialMenu.dataSource = self
+        dialMenu.styleDelegate = self
         dialMenu.sectorWidth = 360.0 / 16.0
         dialMenu.snapsToNearestSector = true
         dialMenu.spinsWithInertia = true
@@ -43,5 +44,14 @@ extension ViewController: BRDialMenuDataSource {
     }
     func viewForItem(in menu: BRDialMenu, at index: Int) -> UIView {
         return menuItems[index]
+    }
+    func titleForItem(in menu: BRDialMenu, at index: Int) -> String {
+        return "Item \(index) Item \(index) Item \(index) Item \(index)"
+    }
+}
+
+extension ViewController: BRDialMenuStyleDelegate {
+    func style(_ titleLabel: UILabel, at index: Int) {
+        titleLabel.backgroundColor = UIColor.red
     }
 }

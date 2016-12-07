@@ -11,17 +11,25 @@ import UIKit
 public protocol BRDialMenuDataSource {
     func numberOfItems(in menu: BRDialMenu) -> Int
     func viewForItem(in menu: BRDialMenu, at index: Int) -> UIView
+    func titleForItem(in menu: BRDialMenu, at index: Int) -> String
+}
+
+public protocol BRDialMenuStyleDelegate {
+    func style(_ titleLabel: UILabel, at index: Int)
 }
 
 @IBDesignable
 public class BRDialMenu: UIView, UIGestureRecognizerDelegate {
 
     //public
-    public var dataSource: BRDialMenuDataSource?
+    public var dataSource: BRDialMenuDataSource!
+    public var styleDelegate: BRDialMenuStyleDelegate?
     @IBInspectable public var itemDiameter: CGFloat = 30.0
     @IBInspectable public var outlineColor: UIColor = .white
     @IBInspectable public var outlineConnected: Bool = true
     @IBInspectable public var outlineWidth: CGFloat = 3.0
+    public var titleFont = UIFont.systemFont(ofSize: 12)
+    public var titleColor = UIColor.black
     public var snapsToNearestSector = true
     public var ignoresTouchesCloseToCenter = true
     public var spinsWithInertia = true
@@ -46,7 +54,7 @@ public class BRDialMenu: UIView, UIGestureRecognizerDelegate {
     private var deltaAngle = 0.0
     private var numberOfItems: Int {
         get {
-            return dataSource?.numberOfItems(in: self) ?? 0
+            return dataSource.numberOfItems(in: self) 
         }
     }
     private var menuItems: [UIView] = []
@@ -55,11 +63,12 @@ public class BRDialMenu: UIView, UIGestureRecognizerDelegate {
     
     private var circleRadius: Double {
         let viewLength = min(self.frame.size.width, self.frame.size.height)
-        return (Double(viewLength) - Double(itemDiameter)) / 2.0
+        return (Double(viewLength) - Double(itemDiameter * 2)) / 2.0
     }
     
     private var baseMenuItemTransforms: [CGAffineTransform] = []
     private var menuItemTransforms: [CGAffineTransform] = []
+    
     
     convenience init() {
         self.init(frame: CGRect.zero)
@@ -88,10 +97,9 @@ public class BRDialMenu: UIView, UIGestureRecognizerDelegate {
         }
     }
     
-    private func frameForItem(atIndex index: Int, startAngle: Angle, center: CGPoint) -> CGRect {
+    private func centerForItem(atIndex index: Int, startAngle: Angle, circleCenter: CGPoint) -> CGPoint {
         let angleBetweenCircleCenters = Angle(degrees: 360.0 / Double(numberOfItems))
-        let itemCenter = CGPoint.pointOnCircumference(origin: center, radius: circleRadius, angle: Angle(degrees: startAngle.degrees + Double(index) * angleBetweenCircleCenters.degrees))
-        return CGRect(center: itemCenter, size: CGSize(width: itemDiameter, height: itemDiameter))
+        return CGPoint.pointOnCircumference(origin: circleCenter, radius: circleRadius, angle: Angle(degrees: startAngle.degrees + Double(index) * angleBetweenCircleCenters.degrees))
     }
     
     override public func draw(_ rect: CGRect) {
@@ -107,17 +115,6 @@ public class BRDialMenu: UIView, UIGestureRecognizerDelegate {
         rotationContainer = UIView(frame: translationContainer.bounds)
         
         for i in 0..<numberOfItems {
-            let item = dataSource!.viewForItem(in: self, at: i)
-            if let baseTransform = baseMenuItemTransforms[safe: i] {
-                item.transform = baseTransform
-            }
-            item.frame = frameForItem(atIndex: i, startAngle: Angle(degrees:orientation.rawValue), center: rotationContainer.bounds.center)
-            item.layer.borderColor = outlineColor.cgColor
-            item.layer.borderWidth = outlineWidth
-            item.layer.cornerRadius = item.frame.size.width / 2.0
-            item.clipsToBounds = true
-            rotationContainer.addSubview(item)
-            menuItems.append(item)
             
             if outlineConnected {
                 //draw connecting line to next circle
@@ -138,8 +135,51 @@ public class BRDialMenu: UIView, UIGestureRecognizerDelegate {
                 arcLayer.fillColor = UIColor.clear.cgColor
                 rotationContainer.layer.addSublayer(arcLayer)
             }
+            
+            
+            let itemCenter = centerForItem(atIndex: i, startAngle: Angle(degrees: orientation.rawValue), circleCenter: rotationContainer.bounds.center)
+            let title = dataSource.titleForItem(in: self, at: i)
+            let itemWidth = itemDiameter * 2
+            let titleSize = (title as NSString).boundingRect(with: CGSize(width: Double(itemWidth), height: DBL_MAX), options: NSStringDrawingOptions.usesLineFragmentOrigin, attributes: [NSFontAttributeName: titleFont, NSForegroundColorAttributeName: titleColor], context: nil).size
+            let itemHeight = (itemDiameter / 2.0 + titleSize.height) * 2.0
+            let itemSize = CGSize(width: itemWidth, height: itemHeight)
+            
+            
+            let item = UIView()
+            if let baseTransform = baseMenuItemTransforms[safe: i] {
+                item.transform = baseTransform
+            }
+            item.frame = CGRect(center: itemCenter, size: itemSize)
+            
+            
+            let itemMainView = dataSource.viewForItem(in: self, at: i)
+            itemMainView.frame = CGRect(center: item.bounds.center, size: CGSize(width: itemDiameter, height: itemDiameter))
+            itemMainView.layer.borderColor = outlineColor.cgColor
+            itemMainView.layer.borderWidth = outlineWidth
+            itemMainView.layer.cornerRadius = itemMainView.frame.size.width / 2.0
+            itemMainView.clipsToBounds = true
+            item.addSubview(itemMainView)
+            
+            
+            let titleFrame = CGRect(center: CGPoint(x: item.bounds.center.x, y: item.bounds.height - titleSize.height / 2.0), size: titleSize)
+            let titleLabel = UILabel(frame: titleFrame)
+            titleLabel.lineBreakMode = .byWordWrapping
+            titleLabel.numberOfLines = 0
+            titleLabel.textAlignment = .center
+            titleLabel.text = title
+            titleLabel.font = titleFont
+            titleLabel.textColor = titleColor
+            if let styleDelegate = self.styleDelegate {
+                styleDelegate.style(titleLabel, at: i)
+            }
+            item.addSubview(titleLabel)
+            
+            menuItems.append(item)
+            rotationContainer.addSubview(item)
+            
         }
-        storeItemTransforms()
+        
+        storeMenuItemTransforms()
         baseMenuItemTransforms = menuItems.map{$0.transform}
         
         translationContainer.addSubview(rotationContainer)
@@ -178,18 +218,18 @@ public class BRDialMenu: UIView, UIGestureRecognizerDelegate {
         return Angle(radians: currentTransformAngle)
     }
     
-    private func storeItemTransforms() {
+    private func storeMenuItemTransforms() {
         menuItemTransforms = menuItems.map{$0.transform}
     }
     
     private func rotateWheel(byAngle angle: Angle) {
         rotationContainer.transform = rotationContainer.transform.rotated(by: CGFloat(angle.radians))
-        for item in self.menuItems {
+        for item in menuItems {
             item.transform = item.transform.rotated(by: CGFloat(-angle.radians))
         }
     }
     
-    private func updateItemTransforms(angleDifference: CGFloat) {
+    private func updateMenuItemTransforms(angleDifference: CGFloat) {
         for (i, item) in self.menuItems.enumerated() {
             item.transform = menuItemTransforms[i].rotated(by: -angleDifference)
         }
@@ -211,7 +251,7 @@ public class BRDialMenu: UIView, UIGestureRecognizerDelegate {
             let dy = point.y - rotationContainer.center.y
             deltaAngle = atan2(Double(dy), Double(dx))
             startTransform = rotationContainer.transform
-            storeItemTransforms()
+            storeMenuItemTransforms()
         } else if recognizer.state == .changed {
             let point = recognizer.location(in: self)
             if (pointWithinPanDistance(point: point)) {
@@ -221,7 +261,7 @@ public class BRDialMenu: UIView, UIGestureRecognizerDelegate {
                     let angle = atan2(Double(dy), Double(dx))
                     let angleDifference = CGFloat(angle - deltaAngle)
                     rotationContainer.transform = startTransform.rotated(by: angleDifference)
-                    updateItemTransforms(angleDifference: angleDifference)
+                    updateMenuItemTransforms(angleDifference: angleDifference)
                 }
             } else {
                 inNoSpinZone = true
@@ -239,7 +279,7 @@ public class BRDialMenu: UIView, UIGestureRecognizerDelegate {
     }
     
     private func decelerate(velocity: Vector2D, point: CGPoint) {
-        storeItemTransforms()
+        storeMenuItemTransforms()
         let vectorFromCenterToPoint = Vector2D(x: Double(point.x - rotationContainer.center.x), y: Double(point.y - rotationContainer.center.y))
         //math from here: http://math.stackexchange.com/a/116239
         let velocityTangentToCircle = vectorFromCenterToPoint.unitVector().crossProduct(velocity)
@@ -262,17 +302,17 @@ public class BRDialMenu: UIView, UIGestureRecognizerDelegate {
                 }
                 UIView.addKeyframe(withRelativeStartTime: 0.0, relativeDuration: 0.0, animations: {
                     self.rotationContainer.transform = initialTransform.rotated(by: CGFloat(directedRotation))
-                    self.updateItemTransforms(angleDifference: CGFloat(directedRotation))
+                    self.updateMenuItemTransforms(angleDifference: CGFloat(directedRotation))
                 })
             }
             if self.snapsToNearestSector {
-                self.storeItemTransforms()
+                self.storeMenuItemTransforms()
                 let currentAngle = self.currentRotationAngle()
                 let nearestSectorAngle = self.nearestSector(angle: currentAngle.radians)
                 let snapAngle = Angle(radians: nearestSectorAngle - currentAngle.radians)
                 UIView.addKeyframe(withRelativeStartTime: 0.0, relativeDuration: 0.0, animations: { 
                     self.rotationContainer.transform = self.rotationContainer.transform.rotated(by: CGFloat(snapAngle.radians))
-                    self.updateItemTransforms(angleDifference: CGFloat(snapAngle.radians))
+                    self.updateMenuItemTransforms(angleDifference: CGFloat(snapAngle.radians))
                 })
             }
         }, completion: { finished in
@@ -281,7 +321,7 @@ public class BRDialMenu: UIView, UIGestureRecognizerDelegate {
     }
     
     private func snapToNearestSector(duration: Double = 0.2, delay: Double = 0.0) {
-        storeItemTransforms()
+        storeMenuItemTransforms()
         let currentTransformAngle = atan2(Double(rotationContainer.transform.b), Double(rotationContainer.transform.a))
         let currentAngle = Angle(radians: currentTransformAngle)
         let nearestSectorAngle = self.nearestSector(angle: currentAngle.radians)
@@ -289,7 +329,7 @@ public class BRDialMenu: UIView, UIGestureRecognizerDelegate {
         
         UIView.animate(withDuration: duration, delay: delay, options: [.allowUserInteraction, .curveEaseOut], animations: {
             self.rotationContainer.transform = self.rotationContainer.transform.rotated(by: CGFloat(snapAngle.radians))
-            self.updateItemTransforms(angleDifference: CGFloat(snapAngle.radians))
+            self.updateMenuItemTransforms(angleDifference: CGFloat(snapAngle.radians))
         }) { finished in
             //finished animating
         }
@@ -309,7 +349,7 @@ public class BRDialMenu: UIView, UIGestureRecognizerDelegate {
     private func pointWithinPanDistance(point: CGPoint) -> Bool {
         if ignoresTouchesCloseToCenter {
             let distanceFromCenter = point.distance(toPoint: CGPoint(x: self.frame.size.width / 2.0, y: self.frame.size.height / 2.0))
-            return (distanceFromCenter > (CGFloat(circleRadius) - itemDiameter * 1.5) && distanceFromCenter < (CGFloat(circleRadius) + itemDiameter * 2))
+            return distanceFromCenter > 100 || (distanceFromCenter > (CGFloat(circleRadius) - itemDiameter * 1.5) && distanceFromCenter < (CGFloat(circleRadius) + itemDiameter * 2))
         } else {
             return true
         }
